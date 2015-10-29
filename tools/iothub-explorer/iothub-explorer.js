@@ -13,6 +13,7 @@ var Message = require('azure-iot-common').Message;
 var Client = require('azure-iothub').Client;
 var Registry = require('azure-iothub').Registry;
 var Https = require('azure-iothub').Https;
+var EventHubClient = require('./lib/eventhubclient.js');
 
 function Count(val) {
   this.val = +val;
@@ -151,6 +152,32 @@ else if (command === 'send') {
     }
   });
 }
+else if (command === 'monitor-events') {
+  if (!arg1) inputError('No device ID given');
+  var startTime = Date.now();
+  
+  var ehClient = new EventHubClient(connString, 'messages/events/');
+  ehClient.GetPartitionIds().then(function(partitionIds) {
+    partitionIds.forEach(function(partitionId) {
+      ehClient.CreateReceiver('$Default', partitionId).then(function(receiver) {
+          // start receiving
+        receiver.StartReceive(startTime).then(function() {
+          receiver.on('error', function(error) {
+            serviceError(error.description);
+          });
+          receiver.on('eventReceived', function(eventData) {
+            if ((eventData.SystemProperties['iothub-connection-device-id'] === arg1) && 
+                (eventData.SystemProperties['x-opt-enqueued-time'] >= startTime)) {
+              console.log('Event received: ');
+              console.log(eventData.Bytes);
+              console.log('');
+            }
+          });
+        });
+      });
+    });
+  });
+}
 else if (command === 'receive') {
   var client = Client.fromConnectionString(connString);
   client.getFeedbackReceiver(function (err, receiver) {
@@ -264,7 +291,9 @@ function usage() {
     '  {green}iothub-explorer{/green} {white}<connection-string> delete <device-id>{/white}',
     '    {grey}Deletes the given device from the IoT Hub.{/grey}',
     '  {green}iothub-explorer{/green} {white}<connection-string> send <device-id> <msg> [--ack="none|positive|negative|full"]{/white}',
-    '    {grey}Sends a cloud-to-device message to the given device, with the option to request feedback about delivery{/grey}',
+    '    {grey}Sends a cloud-to-device message to the given device, optionally with acknowledgment of receipt{/grey}',
+    '  {green}iothub-explorer{/green} {white}<connection-string> monitor-events <device-id>{/white}',
+    '    {grey}Monitors and displays the events received from a specific device.{/grey}',
     '  {green}iothub-explorer{/green} {white}<connection-string> receive [--messages=n]{/white}',
     '    {grey}Receives feedback about the delivery of cloud-to-device messages; optionally exits after receiving {white}n{/white} messages.{/grey}',
     '  {green}iothub-explorer{/green} {white}help{/white}',
