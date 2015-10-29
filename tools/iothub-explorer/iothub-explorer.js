@@ -153,7 +153,11 @@ else if (command === 'send') {
   });
 }
 else if (command === 'monitor-events') {
+ 
   if (!arg1) inputError('No device ID given');
+
+  console.log(colorsTmpl('\n{grey}Monitoring events from device {green}' + arg1 + '{/green}{/grey}'));
+
   var startTime = Date.now();
   
   var ehClient = new EventHubClient(connString, 'messages/events/');
