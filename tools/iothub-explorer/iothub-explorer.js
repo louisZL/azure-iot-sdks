@@ -174,8 +174,10 @@ else if (command === 'monitor-events') {
             }
           });
         });
+        return receiver;
       });
     });
+    return partitionIds;
   });
 }
 else if (command === 'receive') {

@@ -157,26 +157,23 @@ EventHubClient.prototype.GetPartitionIds = function() {
         var rxOptions = { attach: { target: { address: rxName } } };
 
         self._connect().then(function () {
-            var ehName = self.config.eventHubName;
-            
             /* create a receiver for the management endpoint to receive the partition count */
-            self.amqpClient.createReceiver(managementEndpoint, rxOptions).then(function (receiver) {
-                receiver.on('errorReceived', function (rx_err) {
-                    reject(new Error('error receiving reply from Event Hub management endpoint: ' + rx_err));
-                });
-                receiver.on('message', function (msg) {
-                    return resolve(msg.body.partition_ids);
-                });
-
-              /* create a sender to send the request to the $management endpoint */
-              self.amqpClient.createSender(managementEndpoint).then(function (sender) {
-                  sender.on('errorReceived', function (tx_err) {
-                      reject(new Error('error sending request to Event Hub management endpoint: ' + tx_err));
-                  });
-                  var request = { body: 'stub', properties: { messageId: '424242', replyTo: rxName }, applicationProperties: { operation: 'READ', name: ehName, type: 'com.microsoft:eventhub' } };
-                  sender.send(request);
-              });
+            return self.amqpClient.createReceiver(managementEndpoint, rxOptions);
+        }).then(function (receiver) {
+            receiver.on('errorReceived', function (rx_err) {
+                reject(new Error('error receiving reply from Event Hub management endpoint: ' + rx_err));
             });
+            receiver.on('message', function (msg) {
+                resolve(msg.body.partition_ids);
+            });
+            /* create a sender to send the request to the $management endpoint */
+            return self.amqpClient.createSender(managementEndpoint);
+        }).then(function (sender) {
+            sender.on('errorReceived', function (tx_err) {
+                reject(new Error('error sending request to Event Hub management endpoint: ' + tx_err));
+            });
+            var request = { body: 'stub', properties: { messageId: '424242', replyTo: rxName }, applicationProperties: { operation: 'READ', name: self.config.eventHubName, type: 'com.microsoft:eventhub' } };
+            return sender.send(request);
         });
     });
 };
